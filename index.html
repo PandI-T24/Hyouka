@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>評価学可動域訓練練習ツール</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        #result {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #007bff;
+            min-height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+            border: 2px dashed #007bff;
+            border-radius: 8px;
+            background-color: #f0f7ff;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        #result:hover {
+            background-color: #e1f0ff;
+        }
+        #result:active {
+            transform: scale(0.98);
+        }
+        .hint-text {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: -15px;
+            margin-bottom: 15px;
+        }
+        .options {
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 0.95rem;
+            color: #555;
+        }
+        .options input {
+            cursor: pointer;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        /* メモ表示エリアのスタイル */
+        #memoBox {
+            display: none; /* 初期状態は非表示 */
+            text-align: left;
+            background-color: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #333;
+            animation: fadeIn 0.3s ease-out;
+        }
+        .memo-title {
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 4px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>本日の練習メニュー</h1>
+    
+    <div id="result" onclick="toggleMemo()">？</div>
+    <div class="hint-text">（タップすると詳細を表示）</div>
+    
+    <div class="options">
+        <label>
+            <input type="checkbox" id="noDuplicateCheck"> 重複なしで抽選する
+        </label>
+    </div>
+
+    <button onclick="drawLottery()">スタート！</button>
+
+    <div id="memoBox">
+        <div class="memo-title" id="memoName">項目名</div>
+        <div><strong>【関節可動域】</strong> <span id="romVal">-</span></div>
+        <div><strong>【基本軸】</strong> <span id="axisBase">-</span></div>
+        <div><strong>【移動軸】</strong> <span id="axisMove">-</span></div>
+    </div>
+</div>
+
+<script>
+    // 関節可動域・基本軸・移動軸のデータ（日本整形外科学会・日本リハビリテーション医学会基準準拠）
+    const romData = {
+        "肩の屈曲": { rom: "180°", base: "肩峰を通る床への垂直線", move: "上腕骨" },
+        "肩の伸展": { rom: "50°", base: "肩峰を通る床への垂直線", move: "上腕骨" },
+        "肩の外転": { rom: "180°", base: "体幹への垂直線（または肩峰を通る床への垂直線）", move: "上腕骨" },
+        "肩の内転": { rom: "75°", base: "体幹への垂直線（または肩峰を通る床への垂直線）", move: "上腕骨" },
+        "肩の外旋": { rom: "60°", base: "肘を90°屈曲した前腕への垂直線", move: "尺骨" },
+        "肩の内旋": { rom: "80°", base: "肘を90°屈曲した前腕への垂直線", move: "尺骨" },
+        "肩の水平屈曲": { rom: "135°", base: "肩峰を通る矢状面への垂直線", move: "上腕骨" },
+        "肩の水平伸展": { rom: "30°", base: "肩峰を通る矢状面への垂直線", move: "上腕骨" },
+        "肘の屈曲": { rom: "145°", base: "上腕骨", move: "橈骨" },
+        "肘の伸展": { rom: "5°", base: "上腕骨", move: "橈骨" },
+        "前腕の回内": { rom: "90°", base: "上腕骨軸（または橈骨茎状突起と尺骨茎状突起を結ぶ線への垂直線）", move: "手掌面" },
+        "前腕の回外": { rom: "90°", base: "上腕骨軸（または橈骨茎状突起と尺骨茎状突起を結ぶ線への垂直線）", move: "手掌面" },
+        "股の屈曲": { rom: "125°", base: "骨盤を通る床への垂直線（または大転子を通る体幹の縦軸）", move: "大腿骨" },
+        "股の伸展": { rom: "15°", base: "骨盤を通る床への垂直線（または大転子を通る体幹の縦軸）", move: "大腿骨" },
+        "股の外転": { rom: "45°", base: "両側の前上腸骨棘を結ぶ線への垂直線", move: "大腿骨中央線" },
+        "股の内転": { rom: "20°", base: "両側の前上腸骨棘を結ぶ線への垂直線", move: "大腿骨中央線" },
+        "股の外旋": { rom: "45°", base: "膝関節を90°屈曲した下腿軸への垂直線", move: "下腿軸" },
+        "股の内旋": { rom: "45°", base: "膝関節を90°屈曲した下腿軸への垂直線", move: "下腿軸" },
+        "膝の屈曲": { rom: "130°", base: "大腿骨", move: "腓骨（または下腿軸）" },
+        "膝の伸展": { rom: "0°", base: "大腿骨", move: "腓骨（または下腿軸）" },
+        "足関節の背屈": { rom: "20°", base: "腓骨への垂直線", move: "第5中足骨" },
+        "足関節の底屈": { rom: "45°", base: "腓骨への垂直線", move: "第5中足骨" },
+        "足関節の外転": { rom: "10°", base: "第2中足骨長軸への垂直線（足底面）", move: "第2中足骨長軸" },
+        "足関節の内転": { rom: "20°", base: "第2中足骨長軸への垂直線（足底面）", move: "第2中足骨長軸" },
+        "足関節の內がえし": { rom: "30°", base: "足底への垂直線（または下腿軸への垂直線）", move: "足底面" },
+        "足関節の外がえし": { rom: "20°", base: "足底への垂直線（または下腿軸への垂直線）", move: "足底面" }
+    };
+
+    // itemsの配列は、romDataのキーから自動生成します
+    const items = Object.keys(romData);
+    let remainingItems = [...items];
+    let currentItem = ""; // 現在選ばれている項目を記憶
+
+    function drawLottery() {
+        // 新しく引くときは、一度メモを非表示にする
+        document.getElementById("memoBox").style.display = "none";
+
+        const isNoDuplicate = document.getElementById("noDuplicateCheck").checked;
+        
+        if (!isNoDuplicate) {
+            const randomIndex = Math.floor(Math.random() * items.length);
+            currentItem = items[randomIndex];
+            document.getElementById("result").innerText = currentItem;
+            remainingItems = [...items]; 
+            return;
+        }
+
+        if (remainingItems.length === 0) {
+            alert("すべてのメニューを引ききりました！リセットして最初から始めます。");
+            remainingItems = [...items];
+        }
+
+        const randomIndex = Math.floor(Math.random() * remainingItems.length);
+        currentItem = remainingItems[randomIndex];
+        remainingItems.splice(randomIndex, 1);
+
+        document.getElementById("result").innerText = `${currentItem} (残り${remainingItems.length})`;
+    }
+
+    // 青い結果ボックスをタップした時にメモを表示/非表示する関数
+    function toggleMemo() {
+        if (!currentItem || currentItem === "？") return;
+
+        const memoBox = document.getElementById("memoBox");
+        
+        // すでに表示されている場合は隠す
+        if (memoBox.style.display === "block") {
+            memoBox.style.display = "none";
+        } else {
+            // データをセットして表示する
+            const data = romData[currentItem];
+            document.getElementById("memoName").innerText = currentItem;
+            document.getElementById("romVal").innerText = data.rom;
+            document.getElementById("axisBase").innerText = data.base;
+            document.getElementById("axisMove").innerText = data.move;
+            
+            memoBox.style.display = "block";
+        }
+    }
+</script>
+
+</body>
+</html>
